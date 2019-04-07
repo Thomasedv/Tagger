@@ -1,10 +1,7 @@
-import logging
 import os.path
-import time
 import re
 import sys
-import traceback
-
+import time
 
 import mutagen
 import mutagen.mp3
@@ -13,9 +10,9 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from mutagen.easyid3 import EasyID3
 
-import utils
-from table_widget import TableWidget
 from rename_thread import Renamer
+from table_widget import TableWidget, TableWidgetItem
+from utils import stylesheet, get_logger
 
 
 def capitalize(input_str):
@@ -24,7 +21,7 @@ def capitalize(input_str):
         try:
             if idx == 0:
                 letter = letter.upper()
-            elif input_str[idx - 1] in (' ', '.','-','(',')','[',']'):
+            elif input_str[idx - 1] in (' ', '.', '-', '(', ')', '[', ']'):
                 letter = letter.upper()
         except Exception as e:
             print(e)
@@ -84,15 +81,21 @@ class WordFilter:
 
 
 class GUI(QMainWindow):
-    def __init__(self):
-        super().__init__()
 
-        folder = QFileDialog.getExistingDirectory()
+    def __init__(self, settings):
+        super().__init__()
+        self.settings = settings
+
+        if 'folder' not in settings:
+            self.settings['folder'] = QFileDialog.getExistingDirectory()
+        folder = self.settings['folder']
         if not folder:
             sys.exit(1)
+
         self.folder_path = folder
-        self.log = logging.getLogger('Tagger.gui')
-        self.log.info('\n'+'-'*40)
+
+        self.log = get_logger('Tagger.gui')
+        self.log.info('\n' + '-' * 40)
         self.log.info(f'{time.strftime("%c")}')
         self.log.info(f'Starting... Current folder path "{self.folder_path}".')
 
@@ -115,7 +118,7 @@ class GUI(QMainWindow):
         self.setWindowTitle('Tagger')
         self.table = TableWidget(folder, parent=self)
 
-        self.setStyleSheet(utils.stylesheet)
+        self.setStyleSheet(stylesheet)
         self.log.debug('Stylesheet set.')
         # self.items.setRowCount(4)
 
@@ -130,9 +133,13 @@ class GUI(QMainWindow):
         self.table.resizeColumnsToContents()
         self.table.resizeRowsToContents()
 
+        # self.table.resizeColumnsToContents()
+        # self.table.resizeRowsToContents()
+
         horizontal_header = self.table.horizontalHeader()
         horizontal_header.setSectionResizeMode(0, QHeaderView.Stretch)
         horizontal_header.setSectionResizeMode(1, QHeaderView.Stretch)
+
         self.log.debug('Table resized to contents')
 
         # shortcut = QShortcut("Ctrl+N", self.items)
@@ -160,8 +167,19 @@ class GUI(QMainWindow):
         self.renamer.renamer_update.connect(self.update_gui)
         self.renamer.finished.connect(self.rename_finished)
 
+        bar = self.menuBar()
+        file = bar.addMenu("File")
+        set_folder = QAction("Select music folder", self)
+        set_folder.triggered.connect(self.select_music_folder)
+        file.addAction(set_folder)
+
         self.log.debug('Showing window...')
         self.showMaximized()
+
+    def select_music_folder(self):
+        # TODO: Make it save new folder, and reload GUI with new folder. Give warning when changing.
+        self.log.info('Changing music folder!')
+        pass
 
     @staticmethod
     def resource_path(relative_path):
@@ -234,107 +252,116 @@ class GUI(QMainWindow):
         self.renamer.start()
 
     def get_names(self):
-        try:
-            row = 0
-            # self.items.insertRow(0)
-            self.table.blockSignals(True)
-            folder = os.listdir(self.folder_path)
-            for full_file in folder:
-                path = os.path.join(self.folder_path, full_file)
-                if not os.path.isfile(path):
-                    self.log.info(f'Ignored folder: {full_file}')
-                    continue
+        old_col, new_col, ext_col, artist_col, title_col = range(5)
+        row = 0
 
-                for idx, character in enumerate(reversed(full_file)):
-                    if character == '.':
-                        file, extension = full_file[:-idx - 1], full_file[-idx:]
-                        # print(file, extension, sep='')
-                        break
+        # self.items.insertRow(0)
+        self.table.blockSignals(True)
+
+        # folder = os.listdir(self.folder_path)
+
+        folder = sorted(os.listdir(self.folder_path), key=lambda x: os.path.getctime(os.path.join(self.folder_path, x)))
+        for full_file in reversed(folder):
+            path = os.path.join(self.folder_path, full_file)
+            if not os.path.isfile(path):
+                self.log.info(f'Ignored folder: {full_file}')
+                continue
+
+            # TODO: Use library to get exstention (os or pathlib)
+            for idx, character in enumerate(reversed(full_file)):
+                if character == '.':
+                    file, extension = full_file[:-idx - 1], full_file[-idx:]
+                    # print(file, extension, sep='')
+                    break
+            else:
+                self.log.warning(f'Error on finding extension: {full_file}')
+                continue
+
+            # TODO: Introduce a supported files list
+            if extension.lower() not in ('mp3', 'wav', 'flac', 'ogg'):
+                continue
+            title_item = TableWidgetItem('')
+            artist_item = TableWidgetItem('')
+
+            artist_item.setFlags(artist_item.flags() ^ Qt.ItemIsEditable)
+            title_item.setFlags(title_item.flags() ^ Qt.ItemIsEditable)
+
+            try:
+                meta = EasyID3(path)
+                if meta.keys():
+                    if 'title' in meta.keys():
+                        title_item.setText(meta['title'][0])
+                    if 'artist' in meta.keys():
+                        artist_item.setText(meta['artist'][0])
                 else:
-                    self.log.warning('Error on finding extension:', full_file)
-                    continue
-                # Added extension to set to widen support.
+                    pass
+                    # has_id_item.setBackground(QColor)
+            except mutagen.id3.ID3NoHeaderError as e:
+                self.log.info(e)
+            except KeyError as e:
+                self.log.info(f'{file} has no title/artist in tag.')
 
-                if extension.lower() in ('mp3', 'wav', 'flac', 'ogg'):
-                    title_item = QTableWidgetItem('')
-                    artist_item = QTableWidgetItem('')
+            self.table.insertRow(row)
 
-                    artist_item.setFlags(artist_item.flags() ^ Qt.ItemIsEditable)
-                    title_item.setFlags(title_item.flags() ^ Qt.ItemIsEditable)
+            # Old column
+            old_item = TableWidgetItem(file)
+            old_item.setFlags(old_item.flags() ^ Qt.ItemIsEditable)
 
-                    try:
-                        meta = EasyID3(path)
-                        if meta.keys():
-                            if 'title' in meta.keys():
-                                title_item.setText(meta['title'][0])
-                            if 'artist' in meta.keys():
-                                artist_item.setText(meta['artist'][0])
-                        else:
-                            pass
-                            # has_id_item.setBackground(QColor)
-                    except mutagen.id3.ID3NoHeaderError as e:
-                        self.log.info(e)
-                    except KeyError as e:
-                        self.log.info(f'{file} has no title/artist in tag.')
+            # New column
+            new_name = self.word_filter(file.lower())
+            new_name = capitalize(new_name)
+            new_filename = ''.join((new_name, '.', extension))
 
-                    self.table.insertRow(row)
+            count = 1
+            if new_filename != full_file:
+                while new_filename in folder:
+                    self.log.info(f'New name already exists for {new_filename}')
+                    new_name = f'{new_name} ({count})'
+                    new_filename = ''.join((new_name, '.', extension))
+                    count += 1
 
-                    list_item = QTableWidgetItem(file)
+            new_item = TableWidgetItem(new_name)
+            new_item.setData(TableWidget.HANDLED_STATE, TableWidget.UNHANDLED)
+            # If a box was added.
+            if new_name.count(' - ') != 1 or count > 1:
+                new_item.setBackground(QColor('#e38c00'))
 
-                    list_item.setFlags(list_item.flags() ^ Qt.ItemIsEditable)
+            # Extension column
+            extension_item = TableWidgetItem(extension.upper())
+            extension_item.setTextAlignment(Qt.AlignCenter)
+            extension_item.setFlags(extension_item.flags() ^ Qt.ItemIsEditable)
 
-                    try:
-                        self.table.setItem(row, 0, list_item)
-                    except:
-                         traceback.print_exc()
-                    new_name = self.word_filter(file.lower())
-                    new_name = capitalize(new_name)
-                    new_fullfilename = ''.join((new_name, '.', extension))
+            # Inserting to table
+            self.table.setItem(row, old_col, old_item)
+            self.table.setItem(row, new_col, new_item)
+            self.table.setItem(row, ext_col, extension_item)
+            self.table.setItem(row, title_col, title_item)
+            self.table.setItem(row, artist_col, artist_item)
 
-                    count = 1
-                    if new_fullfilename != full_file:
-                        while new_fullfilename in folder:
-                            self.log.info(f'New name already exists for {new_fullfilename}')
-                            new_name = f'{new_name} ({count})'
-                            new_fullfilename = ''.join((new_name, '.', extension))
-                            count += 1
+            row += 1
 
-                    new_item = QTableWidgetItem(new_name)
+        def get_dummy(string=''):
+            dummy = TableWidgetItem(string)
+            dummy.setData(TableWidget.HANDLED_STATE, TableWidget.DIVIDER)
+            dummy.setFlags(dummy.flags() ^ Qt.ItemIsEditable | Qt.ItemIsSelectable)
+            dummy.setBackground(QColor('grey'))
+            return dummy
 
-                    # If a box was added.
-                    if new_name.count(' - ') != 1 or count > 1:
-                        new_item.setBackground(QColor('#e38c00'))
+        self.table.insertRow(row)
 
-                    extension_item = QTableWidgetItem(extension.upper())
-                    extension_item.setTextAlignment(Qt.AlignCenter)
-                    extension_item.setFlags(extension_item.flags() ^ Qt.ItemIsEditable)
-                    self.table.setItem(row, 1, new_item)
-                    self.table.setItem(row, 2, extension_item)
-                    self.table.setItem(row, 3, title_item)
-                    self.table.setItem(row, 4, artist_item)
+        self.table.setItem(row, old_col, get_dummy('RENAMED'))
+        self.table.setItem(row, new_col, get_dummy())
+        self.table.setItem(row, ext_col, get_dummy())
+        self.table.setItem(row, title_col, get_dummy())
+        self.table.setItem(row, artist_col, get_dummy())
 
-                    row += 1
-
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
         self.table.blockSignals(False)
         return row
 
 
 if __name__ == '__main__':
-    log = logging.getLogger('Tagger.gui')
-    log.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('{name:<15}:{levelname:<7}: {message}', style="{")
-    filehandler = logging.FileHandler('rename.log', encoding='utf-8')
-    filehandler.setFormatter(formatter)
-    filehandler.setLevel(logging.INFO)
-    log.addHandler(filehandler)
+    log = get_logger('Tagger.gui')
 
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
     app = QApplication(sys.argv)
     qProcess = GUI()
 

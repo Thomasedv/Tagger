@@ -1,16 +1,16 @@
 import os
 import re
+import sys
 import traceback
-import logging
+from functools import wraps
 
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
-from functools import wraps
-import sys
+from utils import get_logger
 
-log = logging.getLogger('Tagger.Table')
+log = get_logger('Tagger.Table')
 
 
 def signal_blocker(func):
@@ -35,7 +35,18 @@ def signal_blocker(func):
     return wrapper
 
 
+class TableWidgetItem(QTableWidgetItem):
+    def __lt__(self, other):
+        return self.data(TableWidget.HANDLED_STATE) < other.data(TableWidget.HANDLED_STATE)
+
+
 class TableWidget(QTableWidget):
+    RENAMED = '2'
+    DIVIDER = '1'
+    UNHANDLED = '0'
+
+    HANDLED_STATE = 32
+    HANDLED_TIME = 33
 
     def __init__(self, folder, parent=None):
         super(TableWidget, self).__init__(parent=parent)
@@ -48,6 +59,7 @@ class TableWidget(QTableWidget):
         self.last_pre_edit_state = None
 
         self.undo_list = []
+        self._was_checkout = False
         self.redo_list = []
 
         self.undo = QShortcut(QKeySequence('Ctrl+Z'), self)
@@ -68,10 +80,14 @@ class TableWidget(QTableWidget):
                         'Remove (Not delete)': self.delete_file,
                         'Swap positions': self.swap,
                         'Add tag(s)': self.create_tag,
-                        'Play song': self.play_file}
+                        'Play song': self.play_file,
+                        'Checkout files': self.checkout_selection}
 
         self.cellDoubleClicked.connect(self.on_dclick_enter)
         self.cellChanged.connect(self._cell_change_handler)
+
+    # def sortItems(self, p_int, order=Qt.AscendingOrder):
+    #     print()
 
     def on_dclick_enter(self, row, col):
         if col != 1:
@@ -148,6 +164,9 @@ class TableWidget(QTableWidget):
 
             cursor = event.pos()
             index = self.indexAt(cursor)
+            if self.itemFromIndex(index).data(TableWidget.HANDLED_STATE) == TableWidget.DIVIDER:
+                return
+
             column = self.itemFromIndex(index).column()
 
             if column == 1:
@@ -159,6 +178,7 @@ class TableWidget(QTableWidget):
                 menu.addAction('Swap positions')
                 menu.addSeparator()
             menu.addAction('Add tag(s)')
+            menu.addAction('Checkout files')
 
             if len(items) == self.columnCount():
                 play = menu.addAction('Play song')
@@ -167,16 +187,17 @@ class TableWidget(QTableWidget):
             menu.addAction('Remove (Not delete)')
         except:
             traceback.print_exc()
-        # print(menu.actions())
 
         action = menu.exec_(QCursor.pos())
-        try:
 
+        def not_divider(cell):
+            return cell.data(TableWidget.HANDLED_STATE) != TableWidget.DIVIDER
+
+        try:
             if action and action.text() == 'Play song':
                 self.play_file([cell for cell in items if cell.column() in (0, 2)])
             elif action:
-                self._cell_action(action.text(), [cell for cell in items if cell.column() == 1])
-
+                self._cell_action(action.text(), [cell for cell in items if cell.column() == 1 and not_divider(cell)])
         except:
             traceback.print_exc()
 
@@ -247,26 +268,44 @@ class TableWidget(QTableWidget):
 
         return warning_window.exec()
 
-
     @signal_blocker
     def undo_action(self):
         if not self.undo_list:
             return
-        items, states = self.undo_list.pop()
-        self.redo_list.append((items, [cell.text() for cell in items]))
 
-        for cell, text in zip(items, states):
-            cell.setText(text)
+        items, states = self.undo_list.pop()
+        if isinstance(items, str):
+            if items == TableWidget.RENAMED:
+                self.redo_list.append((TableWidget.UNHANDLED, states.copy()))
+            else:
+                self.redo_list.append((TableWidget.RENAMED, states.copy()))
+
+            for cell in states:
+                cell.setData(TableWidget.HANDLED_STATE, items)
+            self.sortItems(1, Qt.AscendingOrder)
+        else:
+            self.redo_list.append((items, [cell.text() for cell in items]))
+            for cell, text in zip(items, states):
+                cell.setText(text)
 
     @signal_blocker
     def redo_action(self):
         if not self.redo_list:
             return
         items, states = self.redo_list.pop()
-        self.undo_list.append((items, [cell.text() for cell in items]))
+        if isinstance(items, str):
+            if items == TableWidget.RENAMED:
+                self.undo_list.append((TableWidget.UNHANDLED, states.copy()))
+            else:
+                self.undo_list.append((TableWidget.RENAMED, states.copy()))
 
-        for cell, text in zip(items, states):
-            cell.setText(text)
+            for cell in states:
+                cell.setData(TableWidget.HANDLED_STATE, items)
+            self.sortItems(1, Qt.AscendingOrder)
+        else:
+            self.undo_list.append((items, [cell.text() for cell in items]))
+            for cell, text in zip(items, states):
+                cell.setText(text)
 
     @signal_blocker
     def name_control(self, items):
@@ -359,6 +398,20 @@ class TableWidget(QTableWidget):
             self.undo_list.pop()
 
     @signal_blocker
+    def checkout_selection(self, items):
+        self.undo_list.append((TableWidget.UNHANDLED, items))
+
+        cell_changed = False
+
+        for cell in items:
+            cell.setData(TableWidget.HANDLED_STATE, TableWidget.RENAMED)
+            cell_changed = True
+
+        self.sortItems(1, Qt.AscendingOrder)
+        if not cell_changed:
+            self.undo_list.pop()
+
+    @signal_blocker
     def remove_punctuation(self, items):
         self.undo_list.append((items, [cell.text() for cell in items]))
         cell_changed = False
@@ -400,6 +453,7 @@ class TableWidget(QTableWidget):
     def create_tag(self, items):
         self.undo_list.append((items, [cell.text() for cell in items]))
         cell_changed = False
+
         for item in items:
             if item.column() == 1:
                 row = item.row()

@@ -1,12 +1,13 @@
 import os
 import traceback
 
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
 import mutagen
 import mutagen.mp3
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 from mutagen.easyid3 import EasyID3
-import logging
+
+from utils import get_logger
 
 
 class Renamer(QThread):
@@ -17,7 +18,7 @@ class Renamer(QThread):
 
     def __init__(self, table, folder_path, parent=None):
         super(Renamer, self).__init__(parent)
-        self.log = logging.getLogger('Tagger.renamer')
+        self.log = get_logger('Tagger.renamer')
         self.table = table
         self.folder_path = folder_path
         self.log.info('Rename thread initialized')
@@ -36,7 +37,8 @@ class Renamer(QThread):
             saves = []
             for row in range(self.table.rowCount()):
                 title, artist = self.table.item(row, 3).text(), self.table.item(row, 4).text()
-
+                if title == '' and artist == '':
+                    continue
                 file_ext = self.table.item(row, 2).text()
                 filename = ''.join((self.table.item(row, 0).text(), '.', file_ext.lower()))
                 path = os.path.join(self.folder_path, filename).replace('/', '\\')
@@ -47,9 +49,6 @@ class Renamer(QThread):
                     meta = EasyID3()
                 except Exception as e:
                     self.log.warning(f'Error happened when fetching metadata:\n{e}')
-                    continue
-
-                if title == '' and artist == '':
                     continue
 
                 skip = False
@@ -80,7 +79,7 @@ class Renamer(QThread):
 
                 saves.append((meta, path))
 
-            jobs = len(saves)*2
+            jobs = len(saves) * 2
             self.renamer_started.emit(0, jobs)
 
             tags_done = 0
@@ -116,7 +115,7 @@ class Renamer(QThread):
         return warning_window.exec()
 
     def run(self):
-        self.log.info('Starting renaming....\n{}'.format('-'*40))
+        self.log.info('Starting renaming....\n{}'.format('-' * 40))
         # Pre-process check:
         renames = []
         old_names = set()
@@ -129,17 +128,22 @@ class Renamer(QThread):
             file_ext = self.table.item(row, 2).text()
             filename = ''.join((self.table.item(row, 0).text(), '.', file_ext.lower()))
             new_filename = ''.join((self.table.item(row, 1).text(), '.', file_ext.lower()))
+
+            if new_filename == '.' or file_ext == '':
+                continue
+
             # print('-   |'+new_filename)
 
             if new_filename == filename:
                 # print('No changes needed!', filename, '->', new_filename)
-                #log.info(f'File "{filename}" has no changes!')
+                # log.info(f'File "{filename}" has no changes!')
                 continue
             else:
                 old_names.add(filename)
 
             if new_filename in old_names:
-                self.log.info(f'File "{filename}" can\'t be renamed to "{new_filename}" since that name already exists!')
+                self.log.info(
+                    f'File "{filename}" can\'t be renamed to "{new_filename}" since that name already exists!')
                 # print(f'{filename} does already exist!')
                 continue
 
@@ -150,7 +154,7 @@ class Renamer(QThread):
         # Emit number of renames!
         rename_length = len(renames)
 
-        self.renamer_started.emit(rename_length, rename_length*2)
+        self.renamer_started.emit(rename_length, rename_length * 2)
 
         errors = 0
         step = rename_length
@@ -162,7 +166,7 @@ class Renamer(QThread):
                 errors += 1
                 self.log.info(f'Error: Renaming failed. Did not get permission to edit file. Might be in use already.')
                 self.log.debug(f'Full error: {e}')
-                #traceback.print_exc()
+                # traceback.print_exc()
             except FileExistsError as e:
                 errors += 1
                 self.log.info(f'Error: Renaming failed. File {file} already exists!')
@@ -171,8 +175,8 @@ class Renamer(QThread):
                 errors += 1
                 self.log.warning(f'An unexpected error was encountered renaming'
                                  f' {file[0]} to {file[1]}, with error:\n{e}')
-                #print(e)
-                #traceback.print_exc()
+                # print(e)
+                # traceback.print_exc()
 
             # Emit progress
             step += 1

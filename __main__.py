@@ -1,29 +1,23 @@
-import logging
 import sys
 
 from PyQt5.QtWidgets import QApplication
 
 from gui import GUI
+from utils import get_logger, FileHandler
 
 
 def main():
-    log = logging.getLogger('Tagger')
-    log.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('{name:<15}:{levelname:<7}: {message}', style="{")
-    filehandler = logging.FileHandler('rename.log', encoding='utf-8')
-    filehandler.setFormatter(formatter)
-    filehandler.setLevel(logging.INFO)
-    log.addHandler(filehandler)
-
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
+    log = get_logger('Tagger')
     app = QApplication(sys.argv)
-    qProcess = GUI()
-
+    file_handler = FileHandler()
+    start_settings = file_handler.load_settings()
+    qProcess = GUI(start_settings)
     EXIT_CODE = app.exec_()
-    log.info('Closing...')
+    log.info('Saving and closing...')
+    # Note: Use modified settings the GUI changes after use.
+    file_handler.save_settings(qProcess.settings)
+    # TODO: Add Tag All button.
+
 
 if __name__ == '__main__':
     main()

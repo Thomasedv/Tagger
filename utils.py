@@ -1,3 +1,94 @@
+import json
+import logging
+import os
+
+log = logging.getLogger('Tagger')
+log.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('{name:<15}:{levelname:<7}: {message}', style="{")
+
+filehandler = logging.FileHandler('rename.log', encoding='utf-8')
+filehandler.setFormatter(formatter)
+filehandler.setLevel(logging.INFO)
+log.addHandler(filehandler)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(formatter)
+log.addHandler(ch)
+
+
+def get_logger(string):
+    return logging.getLogger(string)
+
+
+class FileHandler:
+    """
+    A class to handle loading/saving to files.
+    """
+
+    def __init__(self, settings='settings.json'):
+
+        self.settings_path = settings
+        self.work_dir = os.getcwd().replace('\\', '/')
+
+    @staticmethod
+    def is_file(path):
+        return os.path.isfile(path) and os.access(path, os.X_OK)
+
+    @staticmethod
+    def find_file(relative_path, exist=True):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except AttributeError:
+            base_path = os.path.abspath(".")
+
+        path = os.path.join(base_path, relative_path).replace('\\', '/')
+
+        if exist:
+            if FileHandler.is_file(path):
+                # print(f'Returning existing path: {path}')
+                return path
+            else:
+                # print(f'No found: {relative_path}')
+                return None
+
+        else:
+            # print(f'Returning path: {path}')
+            return path
+
+    def save_settings(self, settings):
+        try:
+            with open(self.settings_path, 'w') as f:
+                json.dump(settings, f, indent=4, sort_keys=True)
+                return True
+        except (OSError, IOError) as e:
+            # TODO: Logging!
+            return False
+
+    def load_settings(self, reset=False) -> dict:
+        """ Reads settings, or writes them if absent, or if instructed to using reset. """
+
+        def get_file(path):
+            """  """
+            if FileHandler.is_file(path):
+                with open(path, 'r') as f:
+                    return json.load(f)
+            else:
+                return {}
+
+        if reset:
+            return {}
+        else:
+            return get_file(self.settings_path)
+
+
+def get_base_settings():
+    pass
+
+
 stylesheet = """
                 QWidget {
                     background-color: #484848;
