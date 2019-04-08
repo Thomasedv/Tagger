@@ -2,14 +2,16 @@ import json
 import logging
 import os
 
+LOG_FILE = 'rename.log'
+
 log = logging.getLogger('Tagger')
 log.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter('{name:<15}:{levelname:<7}: {message}', style="{")
 
-filehandler = logging.FileHandler('rename.log', encoding='utf-8')
+filehandler = logging.FileHandler(LOG_FILE, encoding='utf-8')
 filehandler.setFormatter(formatter)
-filehandler.setLevel(logging.INFO)
+filehandler.setLevel(logging.DEBUG)
 log.addHandler(filehandler)
 
 ch = logging.StreamHandler()

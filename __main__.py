@@ -17,6 +17,7 @@ def main():
     # Note: Use modified settings the GUI changes after use.
     file_handler.save_settings(qProcess.settings)
     # TODO: Add Tag All button.
+    # TODO: Perform code cleanup
 
 
 if __name__ == '__main__':

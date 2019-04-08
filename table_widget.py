@@ -190,9 +190,6 @@ class TableWidget(QTableWidget):
 
         action = menu.exec_(QCursor.pos())
 
-        def not_divider(cell):
-            return cell.data(TableWidget.HANDLED_STATE) != TableWidget.DIVIDER
-
         try:
             if action and action.text() == 'Play song':
                 self.play_file([cell for cell in items if cell.column() in (0, 2)])
@@ -269,20 +266,24 @@ class TableWidget(QTableWidget):
         return warning_window.exec()
 
     @signal_blocker
+    def _move_sort(self, items, states, change_stack):
+        if items == TableWidget.RENAMED:
+            change_stack.append((TableWidget.UNHANDLED, states.copy()))
+        else:
+            change_stack.append((TableWidget.RENAMED, states.copy()))
+
+        for cell in states:
+            cell.setData(TableWidget.HANDLED_STATE, items)
+        self.sortItems(1, Qt.AscendingOrder)
+
+    @signal_blocker
     def undo_action(self):
         if not self.undo_list:
             return
 
         items, states = self.undo_list.pop()
         if isinstance(items, str):
-            if items == TableWidget.RENAMED:
-                self.redo_list.append((TableWidget.UNHANDLED, states.copy()))
-            else:
-                self.redo_list.append((TableWidget.RENAMED, states.copy()))
-
-            for cell in states:
-                cell.setData(TableWidget.HANDLED_STATE, items)
-            self.sortItems(1, Qt.AscendingOrder)
+            self._move_sort(items, states, self.redo_list)
         else:
             self.redo_list.append((items, [cell.text() for cell in items]))
             for cell, text in zip(items, states):
@@ -294,14 +295,7 @@ class TableWidget(QTableWidget):
             return
         items, states = self.redo_list.pop()
         if isinstance(items, str):
-            if items == TableWidget.RENAMED:
-                self.undo_list.append((TableWidget.UNHANDLED, states.copy()))
-            else:
-                self.undo_list.append((TableWidget.RENAMED, states.copy()))
-
-            for cell in states:
-                cell.setData(TableWidget.HANDLED_STATE, items)
-            self.sortItems(1, Qt.AscendingOrder)
+            self._move_sort(items, states, self.undo_list)
         else:
             self.undo_list.append((items, [cell.text() for cell in items]))
             for cell, text in zip(items, states):

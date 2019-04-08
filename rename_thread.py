@@ -26,7 +26,7 @@ class Renamer(QThread):
     def __del__(self):
         self.wait()
 
-    def apply_tag(self):
+    def write_tags_to_files(self):
         """
         Applying tags to files, before renaming them.
         :return:
@@ -120,7 +120,7 @@ class Renamer(QThread):
         renames = []
         old_names = set()
 
-        tags_done = self.apply_tag()
+        tags_done = self.write_tags_to_files()
 
         # Preparing the renaming!
         # Creates a list with files to rename

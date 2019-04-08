@@ -12,7 +12,7 @@ from mutagen.easyid3 import EasyID3
 
 from rename_thread import Renamer
 from table_widget import TableWidget, TableWidgetItem
-from utils import stylesheet, get_logger
+from utils import stylesheet, get_logger, LOG_FILE
 
 
 def capitalize(input_str):
@@ -87,11 +87,15 @@ class GUI(QMainWindow):
         self.settings = settings
 
         if 'folder' not in settings:
-            self.settings['folder'] = QFileDialog.getExistingDirectory()
-        folder = self.settings['folder']
-        if not folder:
-            sys.exit(1)
+            folder = ''
+        else:
+            folder = settings['folder']
 
+        while not folder:
+            folder = self.settings['folder'] = QFileDialog.getExistingDirectory()
+            print(self.settings['folder'])
+
+        folder = self.settings['folder']
         self.folder_path = folder
 
         self.log = get_logger('Tagger.gui')
@@ -100,20 +104,25 @@ class GUI(QMainWindow):
         self.log.info(f'Starting... Current folder path "{self.folder_path}".')
 
         self.alert_icon_path = self.resource_path('Alert.ico')
-        # self.window_icon_path = self.resource_path('icon.ico').replace('\\','/')
+        self.window_icon_path = self.resource_path('icon.ico').replace('\\', '/')
+
         self.alertIcon = QIcon()
+        self.windowIcon = QIcon()
+
         if self.alert_icon_path is None:
             self.log.warning(f'Did not find alert icon.')
         else:
             self.alertIcon.addFile(self.alert_icon_path)
 
+        if self.window_icon_path is None:
+            self.log.warning(f'Did not find window icon.')
+        else:
+            self.windowIcon.addFile(self.window_icon_path)
+            self.setWindowIcon(self.windowIcon)
+
         # TODO: Exception handling for tagging!
         # TODO: Add icons!
 
-        # self.windowIcon = QIcon()
-        # self.windowIcon.addFile(self.window_icon_path)
-
-        # self.setWindowIcon(self.windowIcon)
         self.word_filter = WordFilter()
         self.setWindowTitle('Tagger')
         self.table = TableWidget(folder, parent=self)
@@ -154,11 +163,16 @@ class GUI(QMainWindow):
         self.bottom_bar_layout = QHBoxLayout()
         self.rename_btn = QPushButton('Rename songs')
         self.rename_btn.setFixedWidth(self.rename_btn.fontMetrics().width(self.rename_btn.text()) + 10)
-        self.rename_btn.clicked.connect(self.rename_songs)
+        self.rename_btn.clicked.connect(self.write_to_files)
+
+        self.tagall_btn = QPushButton('Tag all songs')
+        self.tagall_btn.setFixedWidth(self.tagall_btn.fontMetrics().width(self.tagall_btn.text()) + 10)
+        self.tagall_btn.clicked.connect(self.tag_all_songs)
 
         self.progressbar = QProgressBar(parent=self)
 
         self.bottom_bar_layout.addWidget(self.progressbar)
+        self.bottom_bar_layout.addWidget(self.tagall_btn)
         self.bottom_bar_layout.addWidget(self.rename_btn)
         self.vertical_layout.addLayout(self.bottom_bar_layout)
 
@@ -171,15 +185,50 @@ class GUI(QMainWindow):
         file = bar.addMenu("File")
         set_folder = QAction("Select music folder", self)
         set_folder.triggered.connect(self.select_music_folder)
+        log_opener = QAction('Open Log', self)
+        log_opener.triggered.connect(self.open_log)
         file.addAction(set_folder)
+        file.addAction(log_opener)
+
+        about = bar.addMenu("Help")
+        info = QAction('About')
+        git = QAction('GitHub')
 
         self.log.debug('Showing window...')
+        self.logwindow = QTextBrowser()
+        self.logwindow.setFont(QFont('consolas'))
+        self.logwindow.setFontPointSize(12)
+        self.logwindow.setMinimumSize(800, 600)
         self.showMaximized()
 
+    def closeEvent(self, *args, **kwargs):
+        self.logwindow.close()  # Ensure log is closed
+        super(GUI, self).closeEvent(*args, **kwargs)
+
+    def open_log(self):
+        if os.path.isfile(LOG_FILE):
+            with open(LOG_FILE, 'r', encoding='utf-8') as f:
+                self.logwindow.setText(f.read())
+
+            self.logwindow.show()
+
     def select_music_folder(self):
-        # TODO: Make it save new folder, and reload GUI with new folder. Give warning when changing.
-        self.log.info('Changing music folder!')
-        pass
+        temp_path = QFileDialog.getExistingDirectory()
+        result = self.alert_message('Warning!', 'Any unwritten changes will be lost!',
+                                    'Do you want to load a new folder?', True)
+        if result == QMessageBox.Yes:
+            self.folder_path = self.settings['folder'] = temp_path
+            self.rename_finished(0, True)
+
+    def tag_all_songs(self):
+        items = []
+        for row in range(self.table.rowCount()):
+            items.append(self.table.item(row, 1))
+
+        def not_divider(cell):
+            return cell.data(TableWidget.HANDLED_STATE) != TableWidget.DIVIDER
+
+        self.table.create_tag([cell for cell in items if cell.column() == 1 and not_divider(cell)])
 
     @staticmethod
     def resource_path(relative_path):
@@ -214,8 +263,9 @@ class GUI(QMainWindow):
 
         return warning_window.exec()
 
-    def rename_finished(self, results):
-        self.alert_message(*results)
+    def rename_finished(self, results, skip_results=False):
+        if not skip_results:
+            self.alert_message(*results)
         # Reload table
         self.table.blockSignals(True)
         self.log.debug('Clearing table')
@@ -232,7 +282,8 @@ class GUI(QMainWindow):
         horizontal_header.setSectionResizeMode(1, QHeaderView.Stretch)
 
         self.table.blockSignals(False)
-        self.log.debug('File renaming complete!\n{}'.format('-' * 40))
+        if not skip_results:
+            self.log.debug('File renaming complete!\n{}'.format('-' * 40))
 
         self.table.setDisabled(False)
         self.progressbar.reset()
@@ -245,7 +296,7 @@ class GUI(QMainWindow):
     def update_gui(self, value):
         self.progressbar.setValue(value)
 
-    def rename_songs(self):
+    def write_to_files(self):
         self.log.debug('Disabling table!')
         self.table.setDisabled(True)
         self.rename_btn.setDisabled(True)
@@ -349,7 +400,7 @@ class GUI(QMainWindow):
 
         self.table.insertRow(row)
 
-        self.table.setItem(row, old_col, get_dummy('RENAMED'))
+        self.table.setItem(row, old_col, get_dummy('Finished editing'))
         self.table.setItem(row, new_col, get_dummy())
         self.table.setItem(row, ext_col, get_dummy())
         self.table.setItem(row, title_col, get_dummy())
