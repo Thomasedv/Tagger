@@ -10,6 +10,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from mutagen.easyid3 import EasyID3
 
+from dialog import Dialog
 from rename_thread import Renamer
 from table_widget import TableWidget, TableWidgetItem
 from utils import stylesheet, get_logger, LOG_FILE
@@ -65,20 +66,18 @@ class WordFilter:
 
     def __call__(self, text):
         text = self.regexp.sub(lambda match: self.replace_dict[match.group(0)], text)
-        text = re.sub(r'( +[-.,/\\]* +$)', '', text)
-        text = re.sub(r'(^ +)', '', text)
-        text = re.sub(r' +', ' ', text)
-        return text
+        return re.sub(r' +', ' ', re.sub(r'(^ +)', '', re.sub(r'( +[-.,/\\]* +$)', '', text)))
 
     def update_filter(self, replace_dict):
         self.replace_dict = replace_dict
+        substrings = sorted(self.replace_dict, key=len, reverse=True)
+        self.regexp = re.compile('|'.join(map(re.escape, substrings)))
 
     def get_replace_dict(self):
         return self.replace_dict
 
 
 # TODO: Fix right click on wrong columns
-
 
 class GUI(QMainWindow):
 
@@ -93,7 +92,6 @@ class GUI(QMainWindow):
 
         while not folder:
             folder = self.settings['folder'] = QFileDialog.getExistingDirectory()
-            print(self.settings['folder'])
 
         folder = self.settings['folder']
         self.folder_path = folder
@@ -199,6 +197,7 @@ class GUI(QMainWindow):
         self.logwindow.setFont(QFont('consolas'))
         self.logwindow.setFontPointSize(12)
         self.logwindow.setMinimumSize(800, 600)
+
         self.showMaximized()
 
     def closeEvent(self, *args, **kwargs):
@@ -305,6 +304,7 @@ class GUI(QMainWindow):
     def get_names(self):
         old_col, new_col, ext_col, artist_col, title_col = range(5)
         row = 0
+        max_files = -1
 
         # self.items.insertRow(0)
         self.table.blockSignals(True)
@@ -312,25 +312,34 @@ class GUI(QMainWindow):
         # folder = os.listdir(self.folder_path)
 
         folder = sorted(os.listdir(self.folder_path), key=lambda x: os.path.getctime(os.path.join(self.folder_path, x)))
-        for full_file in reversed(folder):
-            path = os.path.join(self.folder_path, full_file)
+
+        if len(folder) > 500:
+            result = self.alert_message('Note!', 'This folder has a lot of files',
+                                        'Do you only want to load all of them?', True, True)
+
+            if result == QMessageBox.Cancel:
+                sys.exit(0)
+
+            elif result == QMessageBox.No:
+                max_files = self.get_max_files()
+            elif result == QMessageBox.Yes:
+                pass
+            else:
+                log.warning('Unexpected respons from dialog!')
+
+        for file in reversed(folder):
+            path = os.path.join(self.folder_path, file)
             if not os.path.isfile(path):
-                self.log.info(f'Ignored folder: {full_file}')
+                self.log.info(f'Ignored folder: {file}')
                 continue
 
-            # TODO: Use library to get exstention (os or pathlib)
-            for idx, character in enumerate(reversed(full_file)):
-                if character == '.':
-                    file, extension = full_file[:-idx - 1], full_file[-idx:]
-                    # print(file, extension, sep='')
-                    break
-            else:
-                self.log.warning(f'Error on finding extension: {full_file}')
+            name, ext = os.path.splitext(file)
+            ext = ext[1:]
+            if ext.lower() not in ('mp3', 'wav', 'flac', 'ogg'):
                 continue
 
             # TODO: Introduce a supported files list
-            if extension.lower() not in ('mp3', 'wav', 'flac', 'ogg'):
-                continue
+
             title_item = TableWidgetItem('')
             artist_item = TableWidgetItem('')
 
@@ -361,14 +370,14 @@ class GUI(QMainWindow):
             # New column
             new_name = self.word_filter(file.lower())
             new_name = capitalize(new_name)
-            new_filename = ''.join((new_name, '.', extension))
+            new_filename = ''.join((new_name, '.', ext))
 
             count = 1
-            if new_filename != full_file:
+            if new_filename != file:
                 while new_filename in folder:
                     self.log.info(f'New name already exists for {new_filename}')
                     new_name = f'{new_name} ({count})'
-                    new_filename = ''.join((new_name, '.', extension))
+                    new_filename = ''.join((new_name, '.', ext))
                     count += 1
 
             new_item = TableWidgetItem(new_name)
@@ -378,7 +387,7 @@ class GUI(QMainWindow):
                 new_item.setBackground(QColor('#e38c00'))
 
             # Extension column
-            extension_item = TableWidgetItem(extension.upper())
+            extension_item = TableWidgetItem(ext.upper())
             extension_item.setTextAlignment(Qt.AlignCenter)
             extension_item.setFlags(extension_item.flags() ^ Qt.ItemIsEditable)
 
@@ -390,6 +399,8 @@ class GUI(QMainWindow):
             self.table.setItem(row, artist_col, artist_item)
 
             row += 1
+            if row == max_files:
+                break
 
         def get_dummy(string=''):
             dummy = TableWidgetItem(string)
@@ -399,7 +410,6 @@ class GUI(QMainWindow):
             return dummy
 
         self.table.insertRow(row)
-
         self.table.setItem(row, old_col, get_dummy('Finished editing'))
         self.table.setItem(row, new_col, get_dummy())
         self.table.setItem(row, ext_col, get_dummy())
@@ -408,6 +418,14 @@ class GUI(QMainWindow):
 
         self.table.blockSignals(False)
         return row
+
+    def get_max_files(self):
+        dialog = Dialog(self, 'How many?', 'Select the number of files you want to load!')
+
+        if dialog.exec_() == QDialog.Accepted:
+            return dialog.get_value()
+        else:
+            sys.exit(0)
 
 
 if __name__ == '__main__':

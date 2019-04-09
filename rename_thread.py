@@ -164,12 +164,13 @@ class Renamer(QThread):
                 self.log.info(f'File successfully renamed: {file[0]} renamed to {file[1]}.')
             except PermissionError as e:
                 errors += 1
-                self.log.info(f'Error: Renaming failed. Did not get permission to edit file. Might be in use already.')
+                self.log.warning(f'Error: Renaming failed. '
+                                 f'Did not get permission to edit file. Might be in use already.')
                 self.log.debug(f'Full error: {e}')
                 # traceback.print_exc()
             except FileExistsError as e:
                 errors += 1
-                self.log.info(f'Error: Renaming failed. File {file} already exists!')
+                self.log.warning(f'Error: Renaming failed. File {file} already exists!')
                 self.log.debug(f'Full error: {e}')
             except Exception as e:
                 errors += 1

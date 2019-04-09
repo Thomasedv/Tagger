@@ -24,6 +24,8 @@ def get_logger(string):
     return logging.getLogger(string)
 
 
+# TODO: Add loading when loading files
+
 class FileHandler:
     """
     A class to handle loading/saving to files.
@@ -87,8 +89,30 @@ class FileHandler:
             return get_file(self.settings_path)
 
 
-def get_base_settings():
-    pass
+def color_text(text: str, color: str = 'darkorange', weight: str = 'bold', sections: tuple = None) -> str:
+    """
+    Formats a piece of string to be colored/bolded.
+    Also supports having a section of the string colored.
+    """
+    text = text.replace('\n', '<br>')
+
+    if not sections:
+        string = ''.join(['<span style=\"color:', color,
+                          '; font-weight:', weight,
+                          """;\" >""", text,
+                          "</span>"]
+                         )
+    else:
+        work_text = text[sections[0]:sections[1]]
+        string = ''.join([text[:sections[0]],
+                          '<span style=\"color:', color,
+                          '; font-weight:', weight,
+                          """;\" >""", work_text,
+                          "</span>",
+                          text[sections[1]:]]
+                         )
+    return string
+
 
 
 stylesheet = """
