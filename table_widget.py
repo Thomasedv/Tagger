@@ -188,6 +188,9 @@ class TableWidget(QTableWidget):
         except:
             traceback.print_exc()
 
+        def not_divider(cell):
+            return cell.data(TableWidget.HANDLED_STATE) != TableWidget.DIVIDER
+
         action = menu.exec_(QCursor.pos())
 
         try:
@@ -195,7 +198,8 @@ class TableWidget(QTableWidget):
                 self.play_file([cell for cell in items if cell.column() in (0, 2)])
             elif action:
                 self._cell_action(action.text(), [cell for cell in items if cell.column() == 1 and not_divider(cell)])
-        except:
+        except Exception as e:
+            log.warning(f'Failed call to action {action} with error: {e}')
             traceback.print_exc()
 
     def keyPressEvent(self, event):

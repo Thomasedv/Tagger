@@ -302,6 +302,10 @@ class GUI(QMainWindow):
         self.renamer.start()
 
     def get_names(self):
+        """
+        path = folder path + name + extension
+        file = name + extension
+        """
         old_col, new_col, ext_col, artist_col, title_col = range(5)
         row = 0
         max_files = -1
@@ -364,11 +368,11 @@ class GUI(QMainWindow):
             self.table.insertRow(row)
 
             # Old column
-            old_item = TableWidgetItem(file)
+            old_item = TableWidgetItem(name)
             old_item.setFlags(old_item.flags() ^ Qt.ItemIsEditable)
 
             # New column
-            new_name = self.word_filter(file.lower())
+            new_name = self.word_filter(name.lower())
             new_name = capitalize(new_name)
             new_filename = ''.join((new_name, '.', ext))
 
