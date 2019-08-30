@@ -60,7 +60,9 @@ class WordFilter:
             '」': '',
             '「': '',
             '[animated]': '',
-            '[ ~secret-nightcore~ edit ]': ''
+            '[ ~secret-nightcore~ edit ]': '',
+            'diversity release': '',
+            'simplicity release': ''
         }
         return replace_dict
 
@@ -306,7 +308,7 @@ class GUI(QMainWindow):
         path = folder path + name + extension
         file = name + extension
         """
-        old_col, new_col, ext_col, artist_col, title_col = range(5)
+        old_col, new_col, ext_col, title_col, artist_col = range(5)
         row = 0
         max_files = -1
 
