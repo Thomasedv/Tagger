@@ -77,6 +77,7 @@ class TableWidget(QTableWidget):
                         'Remove numbers': self.remove_numbers,
                         'Remove punctuation': self.remove_punctuation,
                         'Remove (Not delete)': self.delete_file,
+                        'Reverse tag': self.reverse_tag,
                         'Swap positions': self.swap,
                         'Add tag(s)': self.create_tag,
                         'Play song': self.play_file,
@@ -172,6 +173,7 @@ class TableWidget(QTableWidget):
                 menu.addAction('Remove parentheses')
                 menu.addAction('Remove punctuation')
                 menu.addAction('Remove numbers')
+                menu.addAction('Reverse tag')
                 menu.addAction('Swap positions')
                 menu.addSeparator()
             menu.addAction('Add tag(s)')
@@ -355,6 +357,27 @@ class TableWidget(QTableWidget):
             text, changed = re.subn(r'[0-9]*', '', cell.text())
             if changed:
                 cell.setText(text)
+                cell_changed = True
+
+        if not cell_changed:
+            self.undo_list.pop()
+
+    @signal_blocker
+    def reverse_tag(self, items):
+        self.undo_list.append((items, [cell.text() for cell in items]))
+        cell_changed = False
+
+        for cell in items:
+            row = cell.row()
+            title = self.item(row, 3).text().strip()
+            artist = self.item(row, 4).text().strip()
+
+            if title == '' or artist == '':
+                continue
+
+            new_name = artist + ' - ' + title
+            if cell.text() != new_name:
+                cell.setText(new_name)
                 cell_changed = True
 
         if not cell_changed:

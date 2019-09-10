@@ -104,7 +104,7 @@ class GUI(QMainWindow):
         self.log.info(f'Starting... Current folder path "{self.folder_path}".')
 
         self.alert_icon_path = self.resource_path('Alert.ico')
-        self.window_icon_path = self.resource_path('icon.ico').replace('\\', '/')
+        self.window_icon_path = self.resource_path('icon.ico')
 
         self.alertIcon = QIcon()
         self.windowIcon = QIcon()
