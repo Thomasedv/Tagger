@@ -42,7 +42,6 @@ class TableWidgetItem(QTableWidgetItem):
 
 class TableWidget(QTableWidget):
     RENAMED = '2'
-    DIVIDER = '1'
     UNHANDLED = '0'
 
     HANDLED_STATE = 32
@@ -164,8 +163,6 @@ class TableWidget(QTableWidget):
 
             cursor = event.pos()
             index = self.indexAt(cursor)
-            if self.itemFromIndex(index).data(TableWidget.HANDLED_STATE) == TableWidget.DIVIDER:
-                return
 
             column = self.itemFromIndex(index).column()
 
@@ -188,16 +185,13 @@ class TableWidget(QTableWidget):
         except:
             traceback.print_exc()
 
-        def not_divider(cell):
-            return cell.data(TableWidget.HANDLED_STATE) != TableWidget.DIVIDER
-
         action = menu.exec_(QCursor.pos())
 
         try:
             if action and action.text() == 'Play song':
                 self.play_file([cell for cell in items if cell.column() in (0, 2)])
             elif action:
-                self._cell_action(action.text(), [cell for cell in items if cell.column() == 1 and not_divider(cell)])
+                self._cell_action(action.text(), [cell for cell in items if cell.column() == 1])
         except Exception as e:
             log.warning(f'Failed call to action {action} with error: {e}')
             traceback.print_exc()

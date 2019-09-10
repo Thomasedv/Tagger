@@ -226,10 +226,7 @@ class GUI(QMainWindow):
         for row in range(self.table.rowCount()):
             items.append(self.table.item(row, 1))
 
-        def not_divider(cell):
-            return cell.data(TableWidget.HANDLED_STATE) != TableWidget.DIVIDER
-
-        self.table.create_tag([cell for cell in items if cell.column() == 1 and not_divider(cell)])
+        self.table.create_tag([cell for cell in items if cell.column() == 1])
 
     @staticmethod
     def resource_path(relative_path):
@@ -331,7 +328,7 @@ class GUI(QMainWindow):
             elif result == QMessageBox.Yes:
                 pass
             else:
-                log.warning('Unexpected respons from dialog!')
+                log.warning('Unexpected response from dialog!')
 
         for file in reversed(folder):
             path = os.path.join(self.folder_path, file)
@@ -407,20 +404,6 @@ class GUI(QMainWindow):
             row += 1
             if row == max_files:
                 break
-
-        def get_dummy(string=''):
-            dummy = TableWidgetItem(string)
-            dummy.setData(TableWidget.HANDLED_STATE, TableWidget.DIVIDER)
-            dummy.setFlags(dummy.flags() ^ Qt.ItemIsEditable | Qt.ItemIsSelectable)
-            dummy.setBackground(QColor('grey'))
-            return dummy
-
-        self.table.insertRow(row)
-        self.table.setItem(row, old_col, get_dummy('Finished editing'))
-        self.table.setItem(row, new_col, get_dummy())
-        self.table.setItem(row, ext_col, get_dummy())
-        self.table.setItem(row, title_col, get_dummy())
-        self.table.setItem(row, artist_col, get_dummy())
 
         self.table.blockSignals(False)
         return row
