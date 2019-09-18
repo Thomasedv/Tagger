@@ -89,7 +89,6 @@ class Renamer(QThread):
                     self.log.info(f'Tags saved for {path}')
                 except (PermissionError, mutagen.MutagenError):
                     self.log.warning(f'Failed to save tags to file {path}')
-
                 finally:
                     tags_done += 1
                     self.renamer_update.emit(tags_done)

@@ -20,7 +20,10 @@ def capitalize(input_str):
     output = []
     for idx, letter in enumerate(input_str):
         try:
-            if idx == 0:
+            letter: str
+            if letter.isupper():
+                pass
+            elif idx == 0:
                 letter = letter.upper()
             elif input_str[idx - 1] in (' ', '.', '-', '(', ')', '[', ']'):
                 letter = letter.upper()
