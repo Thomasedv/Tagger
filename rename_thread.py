@@ -23,9 +23,6 @@ class Renamer(QThread):
         self.folder_path = folder_path
         self.log.info('Rename thread initialized')
 
-    def __del__(self):
-        self.wait()
-
     def write_tags_to_files(self):
         """
         Applying tags to files, before renaming them.

@@ -310,7 +310,7 @@ class GUI(QMainWindow):
         """
         old_col, new_col, ext_col, title_col, artist_col = range(5)
         row = 0
-        max_files = -1
+        # max_files = -1
 
         # self.items.insertRow(0)
         self.table.blockSignals(True)
@@ -319,19 +319,19 @@ class GUI(QMainWindow):
 
         folder = sorted(os.listdir(self.folder_path), key=lambda x: os.path.getctime(os.path.join(self.folder_path, x)))
 
-        if len(folder) > 500:
-            result = self.alert_message('Note!', 'This folder has a lot of files',
-                                        'Do you only want to load all of them?', True, True)
-
-            if result == QMessageBox.Cancel:
-                sys.exit(0)
-
-            elif result == QMessageBox.No:
-                max_files = self.get_max_files()
-            elif result == QMessageBox.Yes:
-                pass
-            else:
-                log.warning('Unexpected response from dialog!')
+        # if len(folder) > 500:
+        #     result = self.alert_message('Note!', 'This folder has a lot of files',
+        #                                 'Do you only want to load all of them?', True, True)
+        #
+        #     if result == QMessageBox.Cancel:
+        #         sys.exit(0)
+        #
+        #     elif result == QMessageBox.No:
+        #         max_files = self.get_max_files()
+        #     elif result == QMessageBox.Yes:
+        #         pass
+        #     else:
+        #         log.warning('Unexpected response from dialog!')
 
         for file in reversed(folder):
             path = os.path.join(self.folder_path, file)
@@ -405,8 +405,9 @@ class GUI(QMainWindow):
             self.table.setItem(row, artist_col, artist_item)
 
             row += 1
-            if row == max_files:
-                break
+            # if row == max_files:
+            #     break
+
 
         self.table.blockSignals(False)
         return row
