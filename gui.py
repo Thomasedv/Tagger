@@ -90,24 +90,8 @@ class GUI(QMainWindow):
         super().__init__()
         self.settings = settings
 
-        if 'folder' not in settings:
-            folder = ''
-        else:
-            folder = settings['folder']
-
-        while not folder:
-            folder = self.settings['folder'] = QFileDialog.getExistingDirectory()
-
-        folder = self.settings['folder']
-        self.folder_path = folder
-
-        self.log = get_logger('Tagger.gui')
-        self.log.info('\n' + '-' * 40)
-        self.log.info(f'{time.strftime("%c")}')
-        self.log.info(f'Starting... Current folder path "{self.folder_path}".')
-
         self.alert_icon_path = self.resource_path('Alert.ico')
-        self.window_icon_path = self.resource_path('icon.ico')
+        self.window_icon_path = self.resource_path('Tagger.ico')
 
         self.alertIcon = QIcon()
         self.windowIcon = QIcon()
@@ -122,6 +106,31 @@ class GUI(QMainWindow):
         else:
             self.windowIcon.addFile(self.window_icon_path)
             self.setWindowIcon(self.windowIcon)
+
+        if 'folder' not in settings:
+            folder = ''
+        else:
+            folder = settings['folder']
+
+        intro = True
+        while not folder:
+            if intro:
+                self.alert_message('Hello!', 'Please select the folder with music files.', '', icon=self.windowIcon)
+                intro = False
+
+            folder = self.settings['folder'] = QFileDialog.getExistingDirectory()
+            if not folder:
+                result = self.alert_message('Error', 'You need to select a folder!',
+                                            'Do you want to try again?', True)
+                if result != QMessageBox.Yes:
+                    sys.exit(1)
+
+        self.folder_path = folder
+
+        self.log = get_logger('Tagger.gui')
+        self.log.info('\n' + '-' * 40)
+        self.log.info(f'{time.strftime("%c")}')
+        self.log.info(f'Starting... Current folder path "{self.folder_path}".')
 
         # TODO: Exception handling for tagging!
         # TODO: Add icons!
@@ -218,6 +227,8 @@ class GUI(QMainWindow):
 
     def select_music_folder(self):
         temp_path = QFileDialog.getExistingDirectory()
+        if not temp_path:
+            return
         result = self.alert_message('Warning!', 'Any unwritten changes will be lost!',
                                     'Do you want to load a new folder?', True)
         if result == QMessageBox.Yes:
@@ -248,11 +259,15 @@ class GUI(QMainWindow):
         else:
             return None
 
-    def alert_message(self, title, text, info_text, question=False, allow_cancel=False):
+    def alert_message(self, title, text, info_text, question=False, allow_cancel=False, icon=None):
         warning_window = QMessageBox(parent=self)
         warning_window.setText(text)
         warning_window.setIcon(QMessageBox.Warning)
-        warning_window.setWindowIcon(self.alertIcon)
+        if icon is None:
+            warning_window.setWindowIcon(self.alertIcon)
+        else:
+            warning_window.setWindowIcon(icon)
+            warning_window.setIconPixmap(icon.pixmap(self.alertIcon.availableSizes()[-2]))
         warning_window.setWindowTitle(title)
 
         if info_text:
