@@ -42,7 +42,7 @@ class WordFilter:
             self.replace_dict = replace_dict
 
         substrings = sorted(self.replace_dict, key=len, reverse=True)
-        self.regexp = re.compile('|'.join(map(re.escape, substrings)))
+        self.regexp = re.compile('|'.join(map(re.escape, substrings)), re.IGNORECASE)
 
     def get_base_dict(self):
         replace_dict = {
@@ -70,7 +70,7 @@ class WordFilter:
         return replace_dict
 
     def __call__(self, text):
-        text = self.regexp.sub(lambda match: self.replace_dict[match.group(0)], text)
+        text = self.regexp.sub(lambda match: self.replace_dict[match.group(0).lower()], text)
         return re.sub(r' +', ' ', re.sub(r'(^ +)', '', re.sub(r'( +[-.,/\\]* +$)', '', text)))
 
     def update_filter(self, replace_dict):
@@ -389,7 +389,7 @@ class GUI(QMainWindow):
             old_item.setFlags(old_item.flags() ^ Qt.ItemIsEditable)
 
             # New column
-            new_name = self.word_filter(name.lower())
+            new_name = self.word_filter(name)
             new_name = capitalize(new_name)
             new_filename = ''.join((new_name, '.', ext))
 
@@ -422,7 +422,6 @@ class GUI(QMainWindow):
             row += 1
             # if row == max_files:
             #     break
-
 
         self.table.blockSignals(False)
         return row
