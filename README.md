@@ -9,9 +9,8 @@ This is a working version and all that, at least it should be.
 
 Current features:
 * Load and bulk rename files where some things are formatted automatically with a filter. 
-* Tag files with title and artist from the filename (And only that for now at least)
+* Tag files with title and artist from the filename (And only that,for now at least)
 * Bulk actions like remove parentheses, brackets and numbers, etc. 
-* Checkout section so you can move songs you don't need to edit to the bottom.
 * Highlights song names that don't have a ` - ` in between the title and artist, because those are needed to auto generate the tags from the filename. 
 * Files are added with file creation date first, so most recent files will be at the top. 
 * Tagging and writing filenames only happens when you press the `rename songs` button at the bottom. 
@@ -20,11 +19,13 @@ Current features:
 
 Keep in mind, if your songs are in a protected folder by any antivirus programs, the rename will likely fail.   
 
-Yet to be implemented features, will be before release. Which i don't know when will happen, if ever, please ask if you want them. Nothing motives like someone actually using the program!
+Yet to be implemented features: 
 
 * Change filtered words. Currently just custom words that i often encountered on some youtube videos. 
 * The about menu at the top is empty and doesn't do anything atm, will link to this github eventually.
 * Ability to generate file name from tag.
+
+Please make an issue if you are interested in adding a feature or have a problem. I still use this myself, but haven't had the need for any additional features myself. 
 
 Implementable on demand:
 * Sort/load files based one something else than file creation date.
